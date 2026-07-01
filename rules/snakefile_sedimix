@@ -234,7 +234,7 @@ rule run_mapdamage:
         "benchmarks/run_mapdamage/{sample}.txt"
     shell:
         """
-        mapDamage --merge-libraries -i {input.bam_file} -r {input.ref_file} -d {output.dir} --no-stats
+        mapDamage -i {input.bam_file} -r {input.ref_file} -d {output.dir} --no-stats
         """
 
 rule filter_deaminated_reads:
