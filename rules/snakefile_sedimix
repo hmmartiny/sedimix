@@ -88,7 +88,8 @@ if (config['classification_software'] == "kraken2"):
     rule generate_classified_reads:
         input:
             kraken2_result="1_classification/{sample}.kraken2",
-            fq="temp/{sample}_length_filtered.fq"
+            fq="temp/{sample}_length_filtered.fq",
+            script=workflow.source_path("../scripts/select_reads_from_kraken2.py")
         output:
             fq_classified="temp/{sample}_length_filtered_classified.fq"
         params:
@@ -97,7 +98,7 @@ if (config['classification_software'] == "kraken2"):
             "benchmarks/generate_classified_reads/{sample}.txt"
         shell:
             """
-            python {workflow.basedir}/../scripts/select_reads_from_kraken2.py {params.taxID} {input.kraken2_result} {wildcards.sample}
+            python {input.script} {params.taxID} {input.kraken2_result} {wildcards.sample}
             mv {wildcards.sample}_reads.lst temp/
             seqtk subseq {input.fq} temp/{wildcards.sample}_reads.lst > {output.fq_classified}
             """
@@ -127,7 +128,8 @@ elif (config['classification_software'] == "centrifuge"):
     rule generate_classified_reads:
         input:
             centrifuge_results="1_classification/{sample}.centrifuge",
-            fq="temp/{sample}_length_filtered.fq"
+            fq="temp/{sample}_length_filtered.fq",
+            script=workflow.source_path("../scripts/select_reads_from_centrifuge.py")
         output:
             fq_classified="temp/{sample}_length_filtered_classified.fq"
         params:
@@ -136,7 +138,7 @@ elif (config['classification_software'] == "centrifuge"):
             "benchmarks/generate_classified_reads/{sample}.txt"
         shell:
             """
-            python {workflow.basedir}/../scripts/select_reads_from_centrifuge.py {params.taxID} {input.centrifuge_results} {wildcards.sample}
+            python {input.script} {params.taxID} {input.centrifuge_results} {wildcards.sample}
             mv {wildcards.sample}_reads.lst 1_classification/
             seqtk subseq {input.fq} 1_classification/{wildcards.sample}_reads.lst > {output.fq_classified}
             """
@@ -239,7 +241,8 @@ rule filter_deaminated_reads:
     input:
         bam_file="3_final_reads/{sample}_final.bam",
         ref_file=config["ref_genome"],
-        mapdamage_misincorporation="4_mapdamage_results/{sample}/misincorporation.txt"
+        mapdamage_misincorporation="4_mapdamage_results/{sample}/misincorporation.txt",
+        script=workflow.source_path("../scripts/filter_deaminated_reads.py")
     output:
         deaminated_bam="3_final_reads/{sample}_final_deaminated.bam",
         non_deaminated_bam="3_final_reads/{sample}_final_non_deaminated.bam",
@@ -252,7 +255,7 @@ rule filter_deaminated_reads:
         "benchmarks/filter_deaminated_reads/{sample}.txt"
     shell:
         """
-        python {workflow.basedir}/../scripts/filter_deaminated_reads.py {input.bam_file} {output.deaminated_bam} {output.non_deaminated_bam} {input.ref_file} {output.report_file} --use_mapdamage={params.use_mapdamage}
+        python {input.script} {input.bam_file} {output.deaminated_bam} {output.non_deaminated_bam} {input.ref_file} {output.report_file} --use_mapdamage={params.use_mapdamage}
         samtools index {output.deaminated_bam}
         samtools index {output.non_deaminated_bam}
         """
@@ -289,11 +292,11 @@ rule final_report:
         post_map_qc="2_mapping/{sample}_LandMQ_filtered.bam",
         post_map_qc_rmdup="3_final_reads/{sample}_final.bam",
         deaminated_bam="3_final_reads/{sample}_final_deaminated.bam",
-        report_file="temp/{sample}_ct_report.csv"
+        report_file="temp/{sample}_ct_report.csv",
+        check_alternate_allele=workflow.source_path("../scripts/check_alternative_allele.py")
     output:
         "4_final_report/{sample}.tsv"
     params:
-        check_alternate_allele=os.path.join(workflow.basedir, "..", "scripts", "check_alternative_allele.py"),
         lineage_sites=config["lineage_sites"],
         types=types_str,  # Pass the preprocessed space-separated string here
         use_snp_panel=config["use_snp_panel"],
@@ -347,14 +350,14 @@ rule final_report:
 
         for type in $types; do
             # Proportion hominin derived for the current type
-            proportion=$(python {params.check_alternate_allele} -b {input.post_map_qc_rmdup} -v {params.lineage_sites} -t $type)
+            proportion=$(python {input.check_alternate_allele} -b {input.post_map_qc_rmdup} -v {params.lineage_sites} -t $type)
             proportions="$proportions\t$proportion"
             proportions_headers="$proportions_headers\tPercent ${{type}} derived [%]"
         done
 
         for type in $types; do
             # Proportion hominin derived (deaminated fragments) for the current type
-            p_deaminated=$(python {params.check_alternate_allele} -b {input.deaminated_bam} -v {params.lineage_sites} -t $type)
+            p_deaminated=$(python {input.check_alternate_allele} -b {input.deaminated_bam} -v {params.lineage_sites} -t $type)
             proportions_deaminated="$proportions_deaminated\t$p_deaminated"
             proportions_headers="$proportions_headers\tPercent ${{type}} derived deaminated [%]"
         done
