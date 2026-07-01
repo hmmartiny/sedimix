@@ -90,7 +90,7 @@ if (config['classification_software'] == "kraken2"):
             "benchmarks/generate_classified_reads/{sample}.txt"
         shell:
             """
-            python ../scripts/select_reads_from_kraken2.py {params.taxID} {input.kraken2_result} {wildcards.sample}
+            python {workflow.basedir}/../scripts/select_reads_from_kraken2.py {params.taxID} {input.kraken2_result} {wildcards.sample}
             mv {wildcards.sample}_reads.lst temp/
             seqtk subseq {input.fq} temp/{wildcards.sample}_reads.lst > {output.fq_classified}
             """
@@ -129,7 +129,7 @@ elif (config['classification_software'] == "centrifuge"):
             "benchmarks/generate_classified_reads/{sample}.txt"
         shell:
             """
-            python ../scripts/select_reads_from_centrifuge.py {params.taxID} {input.centrifuge_results} {wildcards.sample}
+            python {workflow.basedir}/../scripts/select_reads_from_centrifuge.py {params.taxID} {input.centrifuge_results} {wildcards.sample}
             mv {wildcards.sample}_reads.lst 1_classification/
             seqtk subseq {input.fq} 1_classification/{wildcards.sample}_reads.lst > {output.fq_classified}
             """
@@ -245,7 +245,7 @@ rule filter_deaminated_reads:
         "benchmarks/filter_deaminated_reads/{sample}.txt"
     shell:
         """
-        python ../scripts/filter_deaminated_reads.py {input.bam_file} {output.deaminated_bam} {output.non_deaminated_bam} {input.ref_file} {output.report_file} --use_mapdamage={params.use_mapdamage}
+        python {workflow.basedir}/../scripts/filter_deaminated_reads.py {input.bam_file} {output.deaminated_bam} {output.non_deaminated_bam} {input.ref_file} {output.report_file} --use_mapdamage={params.use_mapdamage}
         samtools index {output.deaminated_bam}
         samtools index {output.non_deaminated_bam}
         """
@@ -286,7 +286,7 @@ rule final_report:
     output:
         "4_final_report/{sample}.tsv"
     params:
-        check_alternate_allele="../scripts/check_alternative_allele.py",
+        check_alternate_allele=os.path.join(workflow.basedir, "..", "scripts", "check_alternative_allele.py"),
         lineage_sites=config["lineage_sites"],
         types=types_str,  # Pass the preprocessed space-separated string here
         use_snp_panel=config["use_snp_panel"],

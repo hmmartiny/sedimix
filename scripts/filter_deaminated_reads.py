@@ -101,7 +101,7 @@ def filter_reads(input_bam, output_deaminated, output_non_deaminated, reference_
         }
         mapdamage_file = f"4_mapdamage_results/{sample}/misincorporation.txt"
         with open(mapdamage_file, "r") as f:
-            reader = csv.DictReader(f, delimiter="\t")
+            reader = csv.DictReader((line for line in f if not line.startswith('#')), delimiter="\t")
             for row in reader:
                 if int(row["Pos"]) == 1:
                     counts = mismatches[row["End"]]
