@@ -2,16 +2,23 @@ import glob
 import os
 import yaml
 
-# Load the configuration file
-configfile: "config.yaml"
+# Load the configuration file, unless config was already populated by a parent
+# workflow importing this Snakefile via Snakemake's `module:` mechanism with
+# `config: config` (see snakemake.readthedocs.io/en/stable/snakefiles/deployment.html).
+if not config:
+    configfile: "config.yaml"
+
+# Directory containing input FASTQ files. Defaults to "0_data" for standalone
+# use; override via config["sedimix_data_dir"] when importing as a module.
+data_dir = config.get("sedimix_data_dir", "0_data")
 
 # Extract and preprocess `types` from the configuration
 types = config["types"].split(",")  # This creates a list of types
 types_str = " ".join(types)  # This creates a space-separated string
 
 # List all .fq and .fq.gz files in the data folder
-fq_files = glob.glob("0_data/*.fq")
-gz_files = glob.glob("0_data/*.fq.gz")
+fq_files = glob.glob(f"{data_dir}/*.fq")
+gz_files = glob.glob(f"{data_dir}/*.fq.gz")
 
 # If there are .fq.gz files, include them in the list of input files
 input_files = fq_files + [f.replace(".fq.gz", ".fq") for f in gz_files]
@@ -34,9 +41,9 @@ rule all:
 if gz_files:
     rule unzip_fq_files:
         input:
-            "0_data/{sample}.fq.gz"
+            f"{data_dir}/{{sample}}.fq.gz"
         output:
-            "0_data/{sample}.fq"
+            f"{data_dir}/{{sample}}.fq"
         benchmark:
             "benchmarks/unzip_fq_files/{sample}.txt"
         shell:
@@ -45,7 +52,7 @@ if gz_files:
 # Filter reads based on length before classification
 rule filter_reads_by_length:
     input:
-        "0_data/{sample}.fq"
+        f"{data_dir}/{{sample}}.fq"
     output:
         "temp/{sample}_length_filtered.fq"
     params:
@@ -274,7 +281,7 @@ if config.get("keep_non_hominin_reads", False):
 # Final report generation
 rule final_report:
     input:
-        pre_map="0_data/{sample}.fq",
+        pre_map=f"{data_dir}/{{sample}}.fq",
         post_length="temp/{sample}_length_filtered.fq",
         post_classi="temp/{sample}_length_filtered_classified.fq",
         post_map="2_mapping/{sample}_length_filtered_classified.bam",
