@@ -219,22 +219,48 @@ rule mark_duplicates:
 
 # Run mapDamage after classification and mapping
 rule run_mapdamage:
+    # Samples with zero mapped reads after upstream classification/mapping/QC
+    # (e.g. PCR/library blanks and other negative controls, which should have
+    # ~no real hominin DNA) break mapDamage in two distinct ways, both
+    # confirmed hands-on against a real mapDamage2 install:
+    #   1. On some inputs/environments mapDamage exits non-zero outright.
+    #   2. Even when it DOES exit 0 on a genuinely empty BAM ("Successful
+    #      run"), it silently skips writing Length_plot.pdf ("No length
+    #      distributions are available"), which this rule declares as a
+    #      required output — Snakemake would then fail the job anyway with a
+    #      missing-output error, just a different one than case 1.
+    # Rather than depend on mapDamage's exact behaviour across versions/
+    # platforms, short-circuit entirely when there are zero mapped reads and
+    # write minimal placeholder outputs instead — there is no damage signal
+    # to compute from zero reads regardless. misincorporation.txt's header
+    # matches mapDamage2's real column set (confirmed against a real run) so
+    # filter_deaminated_reads.py's csv.DictReader parses it identically to a
+    # real (all-zero) result.
     input:
         bam_file="3_final_reads/{sample}_final.bam",
         ref_file=config["ref_genome"]
     output:
         dir=directory("4_mapdamage_results/{sample}"),
-        dnacomp="4_mapdamage_results/{sample}/dnacomp.txt", 
-        mis_plot="4_mapdamage_results/{sample}/Fragmisincorporation_plot.pdf", 
-        length_plot="4_mapdamage_results/{sample}/Length_plot.pdf", 
-        distribution="4_mapdamage_results/{sample}/lgdistribution.txt", 
-        mis="4_mapdamage_results/{sample}/misincorporation.txt", 
+        dnacomp="4_mapdamage_results/{sample}/dnacomp.txt",
+        mis_plot="4_mapdamage_results/{sample}/Fragmisincorporation_plot.pdf",
+        length_plot="4_mapdamage_results/{sample}/Length_plot.pdf",
+        distribution="4_mapdamage_results/{sample}/lgdistribution.txt",
+        mis="4_mapdamage_results/{sample}/misincorporation.txt",
         log="4_mapdamage_results/{sample}/Runtime_log.txt"
     benchmark:
         "benchmarks/run_mapdamage/{sample}.txt"
     shell:
         """
-        mapDamage -i {input.bam_file} -r {input.ref_file} -d {output.dir} --no-stats
+        n_mapped=$(samtools view -c -F 4 {input.bam_file})
+        if [ "$n_mapped" -eq 0 ]; then
+            echo "WARNING: {input.bam_file} has 0 mapped reads — skipping mapDamage, writing placeholder outputs" >&2
+            mkdir -p {output.dir}
+            touch {output.dnacomp} {output.mis_plot} {output.length_plot} {output.distribution}
+            printf '# table produced by mapDamage version 2.2.3 (placeholder: 0 mapped reads, mapDamage skipped)\\n# Chr: reference from sam/bam header, End: from which termini of DNA sequences, Std: strand of reads\\nChr\\tEnd\\tStd\\tPos\\tA\\tC\\tG\\tT\\tTotal\\tG>A\\tC>T\\tA>G\\tT>C\\tA>C\\tA>T\\tC>G\\tC>A\\tT>G\\tT>A\\tG>C\\tG>T\\tA>-\\tT>-\\tC>-\\tG>-\\t->A\\t->T\\t->C\\t->G\\tS\\n' > {output.mis}
+            echo "0 mapped reads in {input.bam_file}: mapDamage skipped" > {output.log}
+        else
+            mapDamage -i {input.bam_file} -r {input.ref_file} -d {output.dir} --no-stats
+        fi
         """
 
 rule filter_deaminated_reads:
@@ -326,9 +352,16 @@ rule final_report:
         
         # Unique reads
         unique_reads=$(samtools view -c -F 4 {input.post_map_qc_rmdup})
-        
-        # Average duplication rate 
-        dup_rate=$(echo "scale=2; $total_reads_post_map_qc / $unique_reads" | bc)
+
+        # Average duplication rate (unique_reads is 0 for samples with no reads
+        # surviving upstream filtering, e.g. negative controls — bc exits
+        # non-zero on divide-by-zero, which would fail this whole rule under
+        # Snakemake's default set -e shell behaviour, confirmed hands-on)
+        if [ "$unique_reads" -gt 0 ]; then
+            dup_rate=$(echo "scale=2; $total_reads_post_map_qc / $unique_reads" | bc)
+        else
+            dup_rate="NA"
+        fi
 
         # Number of SNPs covered 
         if [ "{params.use_snp_panel}" = "True" ]; then
@@ -339,9 +372,14 @@ rule final_report:
         
         # Deaminated reads
         total_reads_deaminated=$(samtools view -c {input.deaminated_bam})
-    
-        # Percent deaminated (among classified Homo sapiens)
-        percent_deaminated=$(echo "scale=3; ($total_reads_deaminated / $unique_reads) * 100" | bc)
+
+        # Percent deaminated (among classified Homo sapiens) — same
+        # divide-by-zero guard as dup_rate above.
+        if [ "$unique_reads" -gt 0 ]; then
+            percent_deaminated=$(echo "scale=3; ($total_reads_deaminated / $unique_reads) * 100" | bc)
+        else
+            percent_deaminated="NA"
+        fi
         
         # Initialize variables to store results for each type
         proportions=""
