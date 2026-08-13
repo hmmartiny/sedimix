@@ -138,12 +138,13 @@ sedimix/
 An example run folder together with a default [config.yaml](./example_run_start/config.yaml) file can be found in [`example_run_start/`](./example_run_start/). After running *sedimix*, the final output folder should look like [`example_run_end/`](./example_run_end/).
 
 ## Retrieve Your Results
-- **Classified hominin reads**: Located in the `3_final_reads` folder, ending with `{sample_name}_final.bam`. 
-- **Classified hominin reads that have deamination**: Located in the `3_final_reads` folder, ending with `{sample_name}_final_deaminated.bam`.
-- **Classified hominin reads that do not have deamination**: Located in the `3_final_reads` folder, ending with `{sample_name}_final_non_deaminated.bam`.
-- **Classified non-hominin reads (if specified in config.yaml)**: Located in the `3_final_reads` folder, ending with `{sample_name}_non_hominin.fq`. 
-- **Data summary report**: Located in the `4_final_report` folder. `combined_final_report.tsv` contains results for all samples.
-- **Deamination profile**: Located in the `4_mapdamage_results` folder.  
+All outputs are written under a `results/` folder created in your run directory:
+- **Classified hominin reads**: Located in `results/final_reads`, ending with `{sample_name}_final.bam`. 
+- **Classified hominin reads that have deamination**: Located in `results/final_reads`, ending with `{sample_name}_final_deaminated.bam`.
+- **Classified hominin reads that do not have deamination**: Located in `results/final_reads`, ending with `{sample_name}_final_non_deaminated.bam`.
+- **Classified non-hominin reads (if specified in config.yaml)**: Located in `results/final_reads`, ending with `{sample_name}_non_hominin.fq`. 
+- **Data summary report**: Located in `results/final_report`. `combined_final_report.tsv` contains results for all samples.
+- **Deamination profile**: Located in `results/mapdamage`.  
 
 ## License
 This project is licensed under the [MIT License](LICENSE).

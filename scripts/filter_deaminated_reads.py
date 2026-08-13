@@ -63,7 +63,7 @@ def process_read(read, reference):
 
     return is_deaminated_read, c_to_t_5, total_reads_5, c_to_t_3, total_reads_3
 
-def filter_reads(input_bam, output_deaminated, output_non_deaminated, reference_path, report_file, use_mapdamage):
+def filter_reads(input_bam, output_deaminated, output_non_deaminated, reference_path, report_file, use_mapdamage, mapdamage_file=None):
     # Open the reference genome
     reference = Fasta(reference_path)
     
@@ -94,12 +94,10 @@ def filter_reads(input_bam, output_deaminated, output_non_deaminated, reference_
                 non_deaminated_bam.write(read)
     
     if use_mapdamage:
-        sample = report_file.split('_ct_report.csv')[0].split('temp/')[1] 
         mismatches = {
             "5p": {"C": 0, "C>T": 0},
             "3p": {"C": 0, "C>T": 0},
         }
-        mapdamage_file = f"4_mapdamage_results/{sample}/misincorporation.txt"
         with open(mapdamage_file, "r") as f:
             reader = csv.DictReader((line for line in f if not line.startswith('#')), delimiter="\t")
             for row in reader:
@@ -147,10 +145,11 @@ def main():
     parser.add_argument("reference_path", help="Path to the reference genome FASTA file")
     parser.add_argument("report_file", help="Path to the output report CSV file")
     parser.add_argument("--use_mapdamage", help="Enable or disable mapDamage-like behavior", type=bool, default=False)
+    parser.add_argument("--mapdamage_file", help="Path to mapDamage's misincorporation.txt (required if --use_mapdamage)", default=None)
 
     args = parser.parse_args()
 
-    filter_reads(args.input_bam, args.output_deaminated, args.output_non_deaminated, args.reference_path, args.report_file, args.use_mapdamage)
+    filter_reads(args.input_bam, args.output_deaminated, args.output_non_deaminated, args.reference_path, args.report_file, args.use_mapdamage, args.mapdamage_file)
 
 if __name__ == "__main__":
     main()
